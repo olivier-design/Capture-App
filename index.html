@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Capture</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #12121a; --card: #1a1a26; --border: #2a2a3d;
+    --accent: #7c6aff; --accent2: #ff6a9b; --text: #e8e8f0; --muted: #6b6b88;
+    --todo-color: #7c6aff; --idea-color: #ff9f6a; --green: #6affb4; --red: #ff6a6a;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; overscroll-behavior: none; -webkit-font-smoothing: antialiased; }
+  .app { min-height: 100vh; min-height: -webkit-fill-available; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
+
+  .header { padding: 52px 24px 20px; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .logo { font-size: 28px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .date-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 6px 10px; border-radius: 20px; }
+  .count-row { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .count-pill { font-size: 12px; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; border-radius: 20px; border: 1px solid; display: flex; align-items: center; gap: 5px; }
+  .count-pill.todo { color: var(--todo-color); border-color: rgba(124,106,255,0.3); background: rgba(124,106,255,0.08); }
+  .count-pill.idea { color: var(--idea-color); border-color: rgba(255,159,106,0.3); background: rgba(255,159,106,0.08); }
+  .scheduler-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; border-radius: 20px; border: 1px solid; cursor: pointer; transition: all 0.2s; user-select: none; color: var(--green); border-color: rgba(106,255,180,0.3); background: rgba(106,255,180,0.08); }
+  .scheduler-badge.off { color: var(--muted); border-color: var(--border); background: transparent; }
+  .sched-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .scheduler-badge:not(.off) .sched-dot { animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .input-section { padding: 0 16px 16px; }
+  .input-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; transition: border-color 0.2s; }
+  .input-card:focus-within { border-color: var(--accent); }
+  .type-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .type-btn { flex: 1; padding: 8px; border-radius: 12px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .type-btn.active.todo { background: rgba(124,106,255,0.15); border-color: var(--todo-color); color: var(--todo-color); }
+  .type-btn.active.idea { background: rgba(255,159,106,0.15); border-color: var(--idea-color); color: var(--idea-color); }
+  textarea { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-family: 'Syne', sans-serif; font-size: 15px; line-height: 1.5; resize: none; min-height: 60px; max-height: 120px; }
+  textarea::placeholder { color: var(--muted); }
+  .input-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .mic-btn { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 18px; flex-shrink: 0; }
+  .mic-btn.listening { background: rgba(255,106,155,0.15); border-color: var(--accent2); color: var(--accent2); animation: pulse-ring 1s ease-in-out infinite; }
+  @keyframes pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(255,106,155,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,106,155,0)} }
+  .add-btn { padding: 10px 22px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--accent), #9c6aff); color: white; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+  .add-btn:active { transform: scale(0.96); opacity: 0.85; }
+  .mic-status { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--accent2); text-align: center; padding: 4px; min-height: 20px; opacity: 0; transition: opacity 0.2s; }
+  .mic-status.visible { opacity: 1; }
+
+  .list-section { flex: 1; padding: 0 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin: 8px 4px 10px; }
+  .item-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 12px; position: relative; overflow: hidden; }
+  .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 3px 0 0 3px; }
+  .item-card.todo::before { background: var(--todo-color); }
+  .item-card.idea::before { background: var(--idea-color); }
+  .item-card.done { opacity: 0.4; }
+  .item-card.done .item-text { text-decoration: line-through; }
+  .item-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); background: transparent; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; transition: all 0.15s; }
+  .item-card.todo .item-check { border-color: var(--todo-color); }
+  .item-card.idea .item-check { border-color: var(--idea-color); }
+  .item-card.done .item-check { background: var(--green); border-color: var(--green); color: #0a0a0f; }
+  .item-body { flex: 1; min-width: 0; }
+  .item-type { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+  .item-card.todo .item-type { color: var(--todo-color); }
+  .item-card.idea .item-type { color: var(--idea-color); }
+  .item-text { font-size: 14px; line-height: 1.45; color: var(--text); word-break: break-word; }
+  .item-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 5px; }
+  .item-delete { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; opacity: 0.5; transition: opacity 0.15s, color 0.15s; flex-shrink: 0; }
+  .item-delete:hover { opacity: 1; color: var(--red); }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; line-height: 1.6; }
+
+  .bottom-bar { padding: 12px 16px 32px; border-top: 1px solid var(--border); background: var(--bg); }
+  .email-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .email-input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; transition: border-color 0.2s; }
+  .email-input:focus { border-color: var(--accent); }
+  .email-input::placeholder { color: var(--muted); }
+  .send-now-btn { padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .send-now-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .send-now-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .countdown-row { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+  .countdown-label { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--muted); }
+  .countdown-timer { font-size: 15px; font-family: 'JetBrains Mono', monospace; color: var(--accent); letter-spacing: 1px; }
+  .countdown-timer.soon { color: var(--accent2); animation: pulse-text 1s ease-in-out infinite; }
+  @keyframes pulse-text { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  .status-msg { font-size: 12px; font-family: 'JetBrains Mono', monospace; text-align: center; min-height: 16px; }
+  .status-msg.success { color: var(--green); }
+  .status-msg.error { color: var(--red); }
+  .status-msg.loading { color: var(--accent); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 14px; height: 14px; border: 2px solid rgba(124,106,255,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; }
+
+  .sent-toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--green); color: #0a0a0f; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; z-index: 100; white-space: nowrap; }
+  .sent-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">capture.</div>
+      <div class="date-badge" id="dateBadge"></div>
+    </div>
+    <div class="count-row">
+      <div class="count-pill todo">☑ <span id="todoCount">0</span> to-dos</div>
+      <div class="count-pill idea">💡 <span id="ideaCount">0</span> ideas</div>
+      <div class="scheduler-badge" id="schedulerBadge" onclick="toggleScheduler()">
+        <div class="sched-dot"></div>
+        <span id="schedulerLabel">Auto-send ON</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-section">
+    <div class="input-card">
+      <div class="type-toggle">
+        <button class="type-btn active todo" onclick="setType('todo')">☑ To-Do</button>
+        <button class="type-btn idea" onclick="setType('idea')">💡 Idea</button>
+      </div>
+      <textarea id="noteInput" placeholder="Type or tap 🎤 to speak…" rows="2" oninput="autoResize(this)"></textarea>
+      <div class="mic-status" id="micStatus">🎙 Listening…</div>
+      <div class="input-actions">
+        <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+        <button class="add-btn" onclick="addItem()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">✦</div>
+      <div class="empty-text">Nothing captured yet.<br>Start typing or use the mic.</div>
+    </div>
+    <div id="itemList"></div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="email-row">
+      <input class="email-input" id="emailInput" type="email" placeholder="your@email.com" oninput="saveEmail()" />
+      <button class="send-now-btn" id="sendNowBtn" onclick="sendRecap(false)">📧 Send Now</button>
+    </div>
+    <div class="countdown-row">
+      <span class="countdown-label">⏰ Next auto-send (7 pm ET)</span>
+      <span class="countdown-timer" id="countdownTimer">--:--:--</span>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+</div>
+<div class="sent-toast" id="sentToast">✓ Recap sent via Gmail!</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────
+let items = JSON.parse(localStorage.getItem('capture_items') || '[]');
+let currentType = 'todo';
+let recognition = null;
+let isListening = false;
+let schedulerEnabled = localStorage.getItem('capture_scheduler') !== 'false';
+let lastSentDate = localStorage.getItem('capture_last_sent') || '';
+
+// ── Init ─────────────────────────────────────────────────────────────
+function init() {
+  updateDateBadge();
+  renderItems();
+  setupSpeechRecognition();
+  const saved = localStorage.getItem('capture_email');
+  if (saved) document.getElementById('emailInput').value = saved;
+  updateSchedulerBadge();
+  startCountdown();
+  // Poll every 30s for auto-send window
+  setInterval(checkAutoSend, 30000);
+  checkAutoSend();
+}
+
+function updateDateBadge() {
+  const now = new Date();
+  document.getElementById('dateBadge').textContent =
+    now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }).toUpperCase();
+}
+
+// ── Scheduler toggle ─────────────────────────────────────────────────
+function toggleScheduler() {
+  schedulerEnabled = !schedulerEnabled;
+  localStorage.setItem('capture_scheduler', String(schedulerEnabled));
+  updateSchedulerBadge();
+}
+function updateSchedulerBadge() {
+  const badge = document.getElementById('schedulerBadge');
+  document.getElementById('schedulerLabel').textContent = schedulerEnabled ? 'Auto-send ON' : 'Auto-send OFF';
+  badge.classList.toggle('off', !schedulerEnabled);
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────
+function getNext7pmET() {
+  const now = new Date();
+  // Get current date parts in ET
+  const etParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(now).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+
+  const currentHourET = parseInt(etParts.hour);
+  // Build 7pm ET today as UTC
+  const target = new Date(`${etParts.year}-${etParts.month}-${etParts.day}T19:00:00`);
+  // Offset: difference between what JS thinks local is vs what ET display says
+  const localNow = new Date(now.toLocaleString('en-US'));
+  const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const etOffset = localNow - etNow; // ms
+  const target7pm = new Date(target.getTime() + etOffset);
+  if (target7pm <= now) target7pm.setDate(target7pm.getDate() + 1);
+  return target7pm;
+}
+
+function startCountdown() {
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+}
+function updateCountdown() {
+  const diff = getNext7pmET() - new Date();
+  if (diff <= 0) { document.getElementById('countdownTimer').textContent = '00:00:00'; return; }
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const el = document.getElementById('countdownTimer');
+  el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.classList.toggle('soon', h === 0 && m < 5);
+}
+
+function checkAutoSend() {
+  if (!schedulerEnabled || items.length === 0) return;
+  const now = new Date();
+  const etStr = now.toLocaleString('en-US', { timeZone:'America/New_York', hour:'2-digit', minute:'2-digit', hour12:false });
+  const [h, m] = etStr.split(':').map(Number);
+  const todayKey = now.toLocaleDateString('en-CA');
+  if (h === 19 && m === 0 && lastSentDate !== todayKey) {
+    sendRecap(true);
+  }
+}
+
+// ── Items ─────────────────────────────────────────────────────────────
+function setType(type) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.type-btn.${type}`).classList.add('active');
+  document.getElementById('noteInput').placeholder = type === 'todo' ? 'What do you need to do…' : 'What\'s the idea…';
+}
+
+function addItem() {
+  const input = document.getElementById('noteInput');
+  const text = input.value.trim();
+  if (!text) return;
+  items.unshift({ id: Date.now(), type: currentType, text, done: false, time: new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) });
+  save(); renderItems();
+  input.value = ''; input.style.height = '';
+}
+function toggleDone(id) {
+  const item = items.find(i => i.id === id);
+  if (item) { item.done = !item.done; save(); renderItems(); }
+}
+function deleteItem(id) { items = items.filter(i => i.id !== id); save(); renderItems(); }
+function save() { localStorage.setItem('capture_items', JSON.stringify(items)); }
+function saveEmail() { localStorage.setItem('capture_email', document.getElementById('emailInput').value.trim()); }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderItems() {
+  const list = document.getElementById('itemList');
+  const empty = document.getElementById('emptyState');
+  const todos = items.filter(i => i.type === 'todo');
+  const ideas = items.filter(i => i.type === 'idea');
+  document.getElementById('todoCount').textContent = todos.length;
+  document.getElementById('ideaCount').textContent = ideas.length;
+  if (items.length === 0) { empty.style.display = 'block'; list.innerHTML = ''; return; }
+  empty.style.display = 'none';
+  let html = '';
+  if (todos.length) html += `<div class="section-label">To-Dos</div>` + todos.map(renderCard).join('');
+  if (ideas.length) html += `<div class="section-label">Ideas</div>` + ideas.map(renderCard).join('');
+  list.innerHTML = html;
+}
+function renderCard(item) {
+  return `<div class="item-card ${item.type} ${item.done?'done':''}">
+    <button class="item-check" onclick="toggleDone(${item.id})">${item.done?'✓':''}</button>
+    <div class="item-body">
+      <div class="item-type">${item.type==='todo'?'☑ To-Do':'💡 Idea'}</div>
+      <div class="item-text">${escapeHtml(item.text)}</div>
+      <div class="item-time">${item.time}</div>
+    </div>
+    <button class="item-delete" onclick="deleteItem(${item.id})">✕</button>
+  </div>`;
+}
+
+// ── Send via Gmail MCP ────────────────────────────────────────────────
+async function sendRecap(isAuto) {
+  const email = document.getElementById('emailInput').value.trim();
+  if (!email || !email.includes('@')) { if (!isAuto) setStatus('Please enter a valid email address.', 'error'); return; }
+  if (items.length === 0) { if (!isAuto) setStatus('Nothing to recap yet!', 'error'); return; }
+
+  const btn = document.getElementById('sendNowBtn');
+  btn.disabled = true;
+  if (!isAuto) { btn.innerHTML = '<span class="spinner"></span>'; setStatus('Sending via Gmail…', 'loading'); }
+  else { setStatus('Auto-sending recap…', 'loading'); }
+
+  const todos = items.filter(i => i.type === 'todo');
+  const ideas = items.filter(i => i.type === 'idea');
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const itemsSummary = [
+    todos.length ? `TO-DOS (${todos.length}):\n` + todos.map(i => `• [${i.done?'✓':'○'}] ${i.text} (${i.time})`).join('\n') : '',
+    ideas.length ? `IDEAS (${ideas.length}):\n` + ideas.map(i => `• ${i.text} (${i.time})`).join('\n') : ''
+  ].filter(Boolean).join('\n\n');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        mcp_servers: [{ type: 'url', url: 'https://gmail.mcp.claude.com/mcp', name: 'gmail-mcp' }],
+        messages: [{
+          role: 'user',
+          content: `Please send an email via Gmail with the following details:
+
+To: ${email}
+Subject: 📋 Daily Capture Recap — ${today}
+
+Write a warm, well-organized HTML email body (no <html>/<head> wrapper, just the inner body content with inline styles). Recap the following items captured today:
+
+${itemsSummary}
+
+Format it clearly with sections for To-Dos and Ideas. For to-dos, show ✓ for done items and ○ for open ones. Use a clean, readable style. End with an encouraging sign-off and sign as "capture." app.
+
+Send the email now.`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const allText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').toLowerCase();
+    const hasMcpResult = (data.content || []).some(b => b.type === 'mcp_tool_result' || b.type === 'mcp_tool_use');
+    const looksSuccess = hasMcpResult || allText.includes('sent') || allText.includes('email') || data.stop_reason === 'end_turn';
+
+    if (looksSuccess) {
+      const todayKey = new Date().toLocaleDateString('en-CA');
+      lastSentDate = todayKey;
+      localStorage.setItem('capture_last_sent', todayKey);
+      showToast();
+      setStatus(`✓ Recap sent to ${email}`, 'success');
+      setTimeout(() => { items = []; save(); renderItems(); }, 2500);
+    } else {
+      throw new Error('Unexpected response');
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus(isAuto ? '⚠ Auto-send failed — try Send Now.' : '⚠ Send failed. Check email and try again.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '📧 Send Now';
+}
+
+function showToast() {
+  const t = document.getElementById('sentToast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function setStatus(msg, type) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg; el.className = 'status-msg ' + type;
+  if (type === 'success') setTimeout(() => { el.textContent = ''; el.className = 'status-msg'; }, 5000);
+}
+
+// ── Speech ────────────────────────────────────────────────────────────
+function setupSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById('micBtn').style.opacity = '0.3'; return; }
+  recognition = new SR();
+  recognition.continuous = false; recognition.interimResults = true; recognition.lang = 'en-US';
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micBtn').textContent = '⏹';
+    const ms = document.getElementById('micStatus'); ms.textContent = '🎙 Listening…'; ms.classList.add('visible');
+  };
+  recognition.onend = () => {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micBtn').textContent = '🎤';
+    document.getElementById('micStatus').classList.remove('visible');
+  };
+  recognition.onresult = (e) => {
+    let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+    document.getElementById('noteInput').value = t; autoResize(document.getElementById('noteInput'));
+    if (e.results[e.results.length-1].isFinal) recognition.stop();
+  };
+  recognition.onerror = () => {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micBtn').textContent = '🎤';
+    document.getElementById('micStatus').classList.remove('visible');
+  };
+}
+function toggleMic() { if (!recognition) return; if (isListening) recognition.stop(); else recognition.start(); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('noteInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addItem(); }
+  });
+  init();
+});
+</script>
+</body>
+</html>
