@@ -368,15 +368,17 @@ function renderCard(item) {
   </div>`;
 }
 
-// ── Send via Gmail MCP ────────────────────────────────────────────────
+// ── Send Recap ────────────────────────────────────────────────────────
 async function sendRecap(isAuto) {
   const email = document.getElementById('emailInput').value.trim();
   if (!email || !email.includes('@')) { if (!isAuto) setStatus('Please enter a valid email address.', 'error'); return; }
   if (items.length === 0) { if (!isAuto) setStatus('Nothing to recap yet!', 'error'); return; }
+  const apiKey = getApiKey();
+  if (!apiKey) { if (!isAuto) { showSetup(); } return; }
 
   const btn = document.getElementById('sendNowBtn');
   btn.disabled = true;
-  if (!isAuto) { btn.innerHTML = '<span class="spinner"></span>'; setStatus('Sending via Gmail…', 'loading'); }
+  if (!isAuto) { btn.innerHTML = '<span class="spinner"></span>'; setStatus('Composing recap…', 'loading'); }
   else { setStatus('Auto-sending recap…', 'loading'); }
 
   const todos = items.filter(i => i.type === 'todo');
@@ -389,49 +391,48 @@ async function sendRecap(isAuto) {
   ].filter(Boolean).join('\n\n');
 
   try {
+    // Step 1: Use Claude API to compose a nice email body
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': getApiKey(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        mcp_servers: [{ type: 'url', url: 'https://gmail.mcp.claude.com/mcp', name: 'gmail-mcp' }],
         messages: [{
           role: 'user',
-          content: `Please send an email via Gmail with the following details:
-
-To: ${email}
-Subject: 📋 Daily Capture Recap — ${today}
-
-Write a warm, well-organized HTML email body (no <html>/<head> wrapper, just the inner body content with inline styles). Recap the following items captured today:
-
-${itemsSummary}
-
-Format it clearly with sections for To-Dos and Ideas. For to-dos, show ✓ for done items and ○ for open ones. Use a clean, readable style. End with an encouraging sign-off and sign as "capture." app.
-
-Send the email now.`
+          content: `Write a warm, well-organized plain-text email recap for ${today}. Include these captured items:\n\n${itemsSummary}\n\nUse clear sections, show ✓ for done to-dos and ○ for open ones. Be encouraging and brief. Sign off as "capture." app. Return ONLY the email body text, nothing else.`
         }]
       })
     });
 
     const data = await res.json();
-    const allText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').toLowerCase();
-    const hasMcpResult = (data.content || []).some(b => b.type === 'mcp_tool_result' || b.type === 'mcp_tool_use');
-    const looksSuccess = hasMcpResult || allText.includes('sent') || allText.includes('email') || data.stop_reason === 'end_turn';
 
-    if (looksSuccess) {
-      const todayKey = new Date().toLocaleDateString('en-CA');
-      lastSentDate = todayKey;
-      localStorage.setItem('capture_last_sent', todayKey);
-      showToast();
-      setStatus(`✓ Recap sent to ${email}`, 'success');
-      setTimeout(() => { items = []; save(); renderItems(); }, 2500);
-    } else {
-      throw new Error('Unexpected response');
-    }
+    // Check for API errors
+    if (data.error) throw new Error(data.error.message || 'API error');
+
+    const emailBody = data.content?.[0]?.text || itemsSummary;
+
+    // Step 2: Open mailto with the composed body (works on iPhone Mail)
+    const subject = encodeURIComponent(`📋 Daily Capture — ${today}`);
+    const body = encodeURIComponent(emailBody);
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    // Mark as sent
+    const todayKey = new Date().toLocaleDateString('en-CA');
+    lastSentDate = todayKey;
+    localStorage.setItem('capture_last_sent', todayKey);
+    showToast();
+    setStatus('✓ Opening Mail app with your recap…', 'success');
+    setTimeout(() => { items = []; save(); renderItems(); }, 3000);
+
   } catch (err) {
-    console.error(err);
-    setStatus(isAuto ? '⚠ Auto-send failed — try Send Now.' : '⚠ Send failed. Check email and try again.', 'error');
+    console.error('Send error:', err);
+    setStatus(`⚠ Error: ${err.message || 'Send failed. Check your API key.'}`, 'error');
   }
 
   btn.disabled = false;
