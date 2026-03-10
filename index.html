@@ -98,14 +98,61 @@
 
   .sent-toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--green); color: #0a0a0f; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; z-index: 100; white-space: nowrap; }
   .sent-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Setup screen */
+  .setup-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; z-index: 200; }
+  .setup-screen.hidden { display: none; }
+  .setup-logo { font-size: 36px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .setup-subtitle { font-size: 13px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 40px; }
+  .setup-card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 28px 24px; width: 100%; max-width: 380px; }
+  .setup-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .setup-desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+  .setup-desc a { color: var(--accent); text-decoration: none; }
+  .setup-field { margin-bottom: 12px; }
+  .setup-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .setup-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; transition: border-color 0.2s; }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-input::placeholder { color: var(--muted); }
+  .setup-btn { width: 100%; padding: 14px; border-radius: 14px; border: none; background: linear-gradient(135deg, var(--accent), #9c6aff); color: white; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity 0.15s; }
+  .setup-btn:active { opacity: 0.8; }
+  .setup-error { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--red); margin-top: 8px; min-height: 16px; text-align: center; }
+  .setup-footer { font-size: 11px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.6; }
+
+  /* Settings gear */
+  .gear-btn { background: transparent; border: none; cursor: pointer; font-size: 16px; opacity: 0.4; transition: opacity 0.2s; padding: 4px; }
+  .gear-btn:hover { opacity: 1; }
 </style>
 </head>
 <body>
-<div class="app">
+<!-- Setup screen -->
+<div class="setup-screen" id="setupScreen">
+  <div class="setup-logo">capture.</div>
+  <div class="setup-subtitle">your daily capture companion</div>
+  <div class="setup-card">
+    <div class="setup-title">Quick Setup</div>
+    <div class="setup-desc">Enter your <a href="https://console.anthropic.com" target="_blank">Anthropic API key</a> and email. This is saved only on your device — never shared anywhere.</div>
+    <div class="setup-field">
+      <div class="setup-label">Anthropic API Key</div>
+      <input class="setup-input" id="setupApiKey" type="password" placeholder="sk-ant-api03-..." />
+    </div>
+    <div class="setup-field">
+      <div class="setup-label">Your Email</div>
+      <input class="setup-input" id="setupEmail" type="email" placeholder="you@gmail.com" />
+    </div>
+    <button class="setup-btn" onclick="saveSetup()">Get Started →</button>
+    <div class="setup-error" id="setupError"></div>
+  </div>
+  <div class="setup-footer">Your key is stored locally on this device only.<br>You can update it anytime via the ⚙ settings icon.</div>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
   <div class="header">
     <div class="header-top">
       <div class="logo">capture.</div>
-      <div class="date-badge" id="dateBadge"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="gear-btn" onclick="showSetup()" title="Settings">⚙</button>
+        <div class="date-badge" id="dateBadge"></div>
+      </div>
     </div>
     <div class="count-row">
       <div class="count-pill todo">☑ <span id="todoCount">0</span> to-dos</div>
@@ -151,10 +198,37 @@
     </div>
     <div class="status-msg" id="statusMsg"></div>
   </div>
-</div>
+</div><!-- end .app -->
+</div><!-- end #mainApp -->
 <div class="sent-toast" id="sentToast">✓ Recap sent via Gmail!</div>
 
 <script>
+// ── Setup ─────────────────────────────────────────────────────────────
+function getApiKey() { return localStorage.getItem('capture_apikey') || ''; }
+
+function saveSetup() {
+  const key = document.getElementById('setupApiKey').value.trim();
+  const email = document.getElementById('setupEmail').value.trim();
+  const err = document.getElementById('setupError');
+  if (!key.startsWith('sk-ant-')) { err.textContent = 'Key should start with sk-ant-…'; return; }
+  if (!email.includes('@')) { err.textContent = 'Please enter a valid email.'; return; }
+  localStorage.setItem('capture_apikey', key);
+  localStorage.setItem('capture_email', email);
+  document.getElementById('emailInput').value = email;
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('mainApp').style.display = 'flex';
+  err.textContent = '';
+  init();
+}
+
+function showSetup() {
+  document.getElementById('setupApiKey').value = getApiKey();
+  document.getElementById('setupEmail').value = localStorage.getItem('capture_email') || '';
+  document.getElementById('setupError').textContent = '';
+  document.getElementById('setupScreen').classList.remove('hidden');
+  document.getElementById('mainApp').style.display = 'none';
+}
+
 // ── State ────────────────────────────────────────────────────────────
 let items = JSON.parse(localStorage.getItem('capture_items') || '[]');
 let currentType = 'todo';
@@ -172,7 +246,6 @@ function init() {
   if (saved) document.getElementById('emailInput').value = saved;
   updateSchedulerBadge();
   startCountdown();
-  // Poll every 30s for auto-send window
   setInterval(checkAutoSend, 30000);
   checkAutoSend();
 }
@@ -318,7 +391,7 @@ async function sendRecap(isAuto) {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': getApiKey(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -412,7 +485,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('noteInput').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addItem(); }
   });
-  init();
+  // Allow Enter on setup inputs
+  ['setupApiKey','setupEmail'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveSetup();
+    });
+  });
+  if (!getApiKey()) {
+    // First time — show setup
+    document.getElementById('setupScreen').classList.remove('hidden');
+    document.getElementById('mainApp').style.display = 'none';
+  } else {
+    document.getElementById('setupScreen').classList.add('hidden');
+    document.getElementById('mainApp').style.display = 'flex';
+    init();
+  }
 });
 </script>
 </body>
